@@ -1,7 +1,9 @@
 import type { Chess } from 'chess.js'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { PieceSvg } from './chessboard/PieceSvg'
 import { boardTheme } from './chessboard/theme'
+import type { PieceCode } from './pieces/alpha'
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
 const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'] as const
@@ -13,34 +15,6 @@ function isDarkSquare(fileIndex: number, rankIndex: number) {
 
 function squareBaseColor(fileIndex: number, rankIndex: number) {
   return isDarkSquare(fileIndex, rankIndex) ? boardTheme.darkSquare : boardTheme.lightSquare
-}
-
-function pieceToUnicode(piece: { type: string; color: 'w' | 'b' } | null) {
-  if (!piece) return ''
-
-  if (piece.color === 'w') {
-    return (
-      {
-        p: '♙',
-        n: '♘',
-        b: '♗',
-        r: '♖',
-        q: '♕',
-        k: '♔',
-      } as const
-    )[piece.type as keyof typeof whiteMap]
-  }
-
-  return (
-    {
-      p: '♟',
-      n: '♞',
-      b: '♝',
-      r: '♜',
-      q: '♛',
-      k: '♚',
-    } as const
-  )[piece.type as keyof typeof blackMap]
 }
 
 // dev notes: pomocné mapy jen pro TS inference v pieceToUnicode
@@ -86,16 +60,17 @@ export function ChessBoard({
   const desiredBoardPx = desiredSquareSize * 8
 
   useEffect(() => {
-    // dev notes: lock při prvním rozumném výpočtu
-    if (lockedBoardPx == null && desiredBoardPx >= 96) {
-      setLockedBoardPx(desiredBoardPx)
-      return
-    }{
-      setLockedBoardPx(desiredBoardPx)
-      return
-    }
+  // dev notes: první lock jakmile máme rozumnou velikost
+  if (lockedBoardPx == null && desiredBoardPx >= 96) {
+    setLockedBoardPx(desiredBoardPx)
+    return
+  }
 
-  }, [desiredBoardPx, lockedBoardPx])
+  // dev notes: pokud už lock máme, měň jen při výrazné změně (resize)
+  if (lockedBoardPx != null && Math.abs(desiredBoardPx - lockedBoardPx) >= 16) {
+    setLockedBoardPx(desiredBoardPx)
+  }
+}, [desiredBoardPx, lockedBoardPx])
 
   const boardPx = lockedBoardPx ?? desiredBoardPx
   const squareSize = Math.floor(boardPx / 8)
@@ -181,7 +156,9 @@ export function ChessBoard({
                   const showFile = showCoordinates && rankIndex === 7
                   const coordColor = dark ? boardTheme.coordOnDark : boardTheme.coordOnLight
 
-                  const symbol = pieceToUnicode(piece as any)
+                  const pieceCode: PieceCode | null = piece
+                    ? (`${piece.color}${piece.type.toUpperCase()}` as PieceCode)
+                    : null// pieceCode bude např. "wP", "bK"
 
                   return (
                     <Pressable
@@ -213,7 +190,11 @@ export function ChessBoard({
                           <View
                             style={[
                               StyleSheet.absoluteFill,
-                              { backgroundColor: boardTheme.selected },
+                              {
+                                borderWidth: 3,
+                                borderColor: boardTheme.selected,
+                                
+                                },
                             ]}
                           />
                         ) : null}
@@ -263,7 +244,10 @@ export function ChessBoard({
 
                       {/* Piece layer (temporary unicode; next step will be SVG) */}
                       <View style={styles.pieceCenter} pointerEvents="none">
-                        <Text style={{ fontSize: Math.round(squareSize * 0.46) }}>{symbol}</Text>
+                        {pieceCode ? <PieceSvg
+                                code={pieceCode as any}
+                                size={Math.round(squareSize * 0.88)}
+                                /> : null}
                       </View>
                     </Pressable>
                   )
@@ -301,8 +285,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   pieceCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+
+  // jemný stín pro web
+  shadowColor: '#000',
+  shadowOpacity: 0.15,
+  shadowRadius: 2,
   },
 })
