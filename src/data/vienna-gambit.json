@@ -1,0 +1,79 @@
+{
+  "lessonId": "lesson-vienna-gambit",
+  "title": "Vienna Gambit (white)",
+  "description": "Vienna Gambit je agresivní otevření po 1.e4 e5 2.Nc3, kde bílý hraje f4 a okamžitě bojuje o centrum. Vede k ostrým taktickým pozicím a rychlému vývoji s tlakem na krále.",
+  "coverFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+  "exercises": [
+    {
+      "id": "vg-1",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "label": "Main Line – 4...Ng8",
+      "script": [
+        { "actor": "user", "uci": "e2e4" },
+        { "actor": "system", "uci": "e7e5" },
+        { "actor": "user", "uci": "b1c3" },
+        { "actor": "system", "uci": "g8f6" },
+        { "actor": "user", "uci": "f2f4" },
+        { "actor": "system", "uci": "e5f4" },
+        { "actor": "user", "uci": "e4e5" },
+        { "actor": "system", "uci": "f6g8" },
+        { "actor": "user", "uci": "g1f3" },
+        { "actor": "system", "uci": "d7d6" },
+        { "actor": "user", "uci": "d2d4" },
+        { "actor": "system", "uci": "d6e5" },
+        { "actor": "user", "uci": "d1e2" },
+        { "actor": "system", "uci": "f8e7" },
+        { "actor": "user", "uci": "e2e5" }
+      ],
+      "successMessage": "Strong central control and development."
+    },
+    {
+      "id": "vg-2",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "label": "Qe7 Variation – Tactical shot",
+      "script": [
+        { "actor": "user", "uci": "e2e4" },
+        { "actor": "system", "uci": "e7e5" },
+        { "actor": "user", "uci": "b1c3" },
+        { "actor": "system", "uci": "g8f6" },
+        { "actor": "user", "uci": "f2f4" },
+        { "actor": "system", "uci": "e5f4" },
+        { "actor": "user", "uci": "e4e5" },
+        { "actor": "system", "uci": "d8e7" },
+        { "actor": "user", "uci": "d1e2" },
+        { "actor": "system", "uci": "f6g8" },
+        { "actor": "user", "uci": "g1f3" },
+        { "actor": "system", "uci": "d7d6" },
+        { "actor": "user", "uci": "c3d5" },
+        { "actor": "system", "uci": "e7d7" },
+        { "actor": "user", "uci": "d5c7" },
+        { "actor": "system", "uci": "d7c7" },
+        { "actor": "user", "uci": "e5d6" },
+        { "actor": "system", "uci": "c7e7" },
+        { "actor": "user", "uci": "d6e7" }
+      ],
+      "successMessage": "Winning material through tactics."
+    },
+    {
+      "id": "vg-3",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "label": "Nc6 Line – Central Expansion",
+      "script": [
+        { "actor": "user", "uci": "e2e4" },
+        { "actor": "system", "uci": "e7e5" },
+        { "actor": "user", "uci": "b1c3" },
+        { "actor": "system", "uci": "g8f6" },
+        { "actor": "user", "uci": "f2f4" },
+        { "actor": "system", "uci": "b8c6" },
+        { "actor": "user", "uci": "f4e5" },
+        { "actor": "system", "uci": "c6e5" },
+        { "actor": "user", "uci": "d2d4" },
+        { "actor": "system", "uci": "e5g6" },
+        { "actor": "user", "uci": "e4e5" },
+        { "actor": "system", "uci": "f6g8" },
+        { "actor": "user", "uci": "g1f3" }
+      ],
+      "successMessage": "Space advantage secured."
+    }
+  ]
+}

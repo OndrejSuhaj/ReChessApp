@@ -1,0 +1,21 @@
+{
+  "lessonId": "lesson-scholars-mate",
+  "title": "Scholar’s Mate (white)",
+  "exercises": [
+    {
+      "id": "sm-1",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "label": "Scholar’s Mate",
+      "script": [
+        { "actor": "user", "uci": "e2e4" },
+        { "actor": "system", "uci": "e7e5" },
+        { "actor": "user", "uci": "d1h5" },
+        { "actor": "system", "uci": "b8c6" },
+        { "actor": "user", "uci": "f1c4" },
+        { "actor": "system", "uci": "g8f6" },
+        { "actor": "user", "uci": "h5f7" }
+      ],
+      "successMessage": "Mate!"
+    }
+  ]
+}
