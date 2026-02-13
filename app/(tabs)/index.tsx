@@ -156,7 +156,6 @@ function playUserUci(uci: string): 'ok' | 'wrong' | 'illegal' {
       <ChessBoard
         game={game}
         onUci={playUserUci}
-        size={72}
         lastUci={lastUci}
         disabled={isDone}
       />

@@ -1,172 +1,308 @@
 import type { Chess } from 'chess.js'
-import React, { useMemo, useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { boardTheme } from './chessboard/theme'
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
 const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'] as const
 
-function squareColor(fileIndex: number, rankIndex: number) {
-  // (0,0) = a8
-  return (fileIndex + rankIndex) % 2 === 0 ? '#eee' : '#999'
+function isDarkSquare(fileIndex: number, rankIndex: number) {
+  // (0,0) = a8 is light on standard boards
+  return (fileIndex + rankIndex) % 2 === 1
 }
+
+function squareBaseColor(fileIndex: number, rankIndex: number) {
+  return isDarkSquare(fileIndex, rankIndex) ? boardTheme.darkSquare : boardTheme.lightSquare
+}
+
+function pieceToUnicode(piece: { type: string; color: 'w' | 'b' } | null) {
+  if (!piece) return ''
+
+  if (piece.color === 'w') {
+    return (
+      {
+        p: '♙',
+        n: '♘',
+        b: '♗',
+        r: '♖',
+        q: '♕',
+        k: '♔',
+      } as const
+    )[piece.type as keyof typeof whiteMap]
+  }
+
+  return (
+    {
+      p: '♟',
+      n: '♞',
+      b: '♝',
+      r: '♜',
+      q: '♛',
+      k: '♚',
+    } as const
+  )[piece.type as keyof typeof blackMap]
+}
+
+// dev notes: pomocné mapy jen pro TS inference v pieceToUnicode
+const whiteMap = { p: '♙', n: '♘', b: '♗', r: '♖', q: '♕', k: '♔' } as const
+const blackMap = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' } as const
 
 export function ChessBoard({
   game,
   onUci,
-  size = 72,
+  maxBoardWidth = 640,
+  padding = 0,
   lastUci = null,
   disabled = false,
+  showCoordinates = true,
 }: {
   game: Chess
   onUci: (uci: string) => 'ok' | 'wrong' | 'illegal'
-  size?: number
+  // dev notes: cap pro web – ať board není přerostlý
+  maxBoardWidth?: number
+  // dev notes: vnitřní odsazení wrapperu kolem boardu
+  padding?: number
+  // dev notes: pro zvýraznění posledního tahu (from+to)
   lastUci?: string | null
   disabled?: boolean
+  showCoordinates?: boolean
 }) {
+  const { width: windowWidth } = useWindowDimensions()
+
   const [from, setFrom] = useState<string | null>(null)
   const [flashSquare, setFlashSquare] = useState<string | null>(null)
-  
+
+  // dev notes: Na RN Web se může při loadu krátce změnit šířka/layout → board by "poskočil".
+  // Proto lockneme boardPx po prvním stabilním výpočtu a měníme ho až při výraznější změně.
+  const [lockedBoardPx, setLockedBoardPx] = useState<number | null>(null)
+
+  const safetyMargin = 24 // dev notes: rezerva pro layout/padding/taby (hlavně na webu)
+  const availableWidth = Math.max(0, windowWidth - padding * 2 - safetyMargin)
+  const boardTarget = Math.min(availableWidth, maxBoardWidth)
+
+  // dev notes: minSquareSize – na mobilu/menším okně chceme umět jít níž
+  const minSquareSize = 14
+  const desiredSquareSize = Math.max(minSquareSize, Math.floor(boardTarget / 8))
+  const desiredBoardPx = desiredSquareSize * 8
+
+  useEffect(() => {
+    // dev notes: lock při prvním rozumném výpočtu
+    if (lockedBoardPx == null && desiredBoardPx >= 96) {
+      setLockedBoardPx(desiredBoardPx)
+      return
+    }{
+      setLockedBoardPx(desiredBoardPx)
+      return
+    }
+
+  }, [desiredBoardPx, lockedBoardPx])
+
+  const boardPx = lockedBoardPx ?? desiredBoardPx
+  const squareSize = Math.floor(boardPx / 8)
 
   const board = useMemo(() => {
-    // chess.js: board() returns 8x8, ranks from 8 -> 1, files a -> h
+    // dev notes: board() je 8x8, ranks 8→1, files a→h
     return game.board()
-    
   }, [game.fen()])
 
   function handleSquarePress(square: string) {
     if (disabled) return
+
+    // 1) první klik = vybrat FROM
     if (!from) {
       setFrom(square)
       return
     }
+
+    // 2) klik na stejný square = zrušit výběr
     if (from === square) {
       setFrom(null)
       return
     }
+
+    // 3) druhý klik = TO → UCI
     const uci = `${from}${square}`
     const result = onUci(uci)
 
+    // dev notes: krátký flash cílového pole při wrong/illegal
     if (result !== 'ok') {
-        // flash cílové pole červeně a reset výběru
-        setFlashSquare(square)
-        setTimeout(() => setFlashSquare(null), 220)
+      setFlashSquare(square)
+      setTimeout(() => setFlashSquare(null), 220)
     }
 
     setFrom(null)
   }
-  
+
+  const lastFrom = lastUci ? lastUci.slice(0, 2) : null
+  const lastTo = lastUci ? lastUci.slice(2, 4) : null
+
+  // dev notes: pokud je width extrémně malá (nebo na prvním renderu), radši nevykresluj board
+  const isReady = boardPx >= 96
 
   return (
-    <View style={{ gap: 8 }}>
-      <Text style={{ fontWeight: '600' }}>
+    <View style={{ gap: 10 }}>
+      <Text style={styles.header}>
         Tap from → to {from ? `(from: ${from})` : ''}
       </Text>
 
-      <View style={{ borderWidth: 1, borderRadius: 12, overflow: 'hidden' }}>
-        {board.map((rank, rankIndex) => (
-          <View key={rankIndex} style={{ flexDirection: 'row' }}>
-            {rank.map((piece, fileIndex) => {
-                const file = FILES[fileIndex]
-                const rankLabel = RANKS[rankIndex]
-                const square = `${file}${rankLabel}`
-                const isFlash = flashSquare === square
+      {!isReady ? (
+        // dev notes: placeholder brání layout shift při úplně prvním renderu
+        <View style={{ height: 320 }} />
+      ) : (
+        <View style={{ padding, width: '100%', alignSelf: 'stretch' }}>
+          <View
+            style={[
+              styles.boardFrame,
+              {
+                borderColor: boardTheme.border,
+                width: boardPx,
+                height: boardPx,
+                alignSelf: 'flex-start',
+              },
+            ]}
+          >
+            {board.map((rank, rankIndex) => (
+              <View key={rankIndex} style={styles.row}>
+                {rank.map((piece, fileIndex) => {
+                  const file = FILES[fileIndex]
+                  const rankLabel = RANKS[rankIndex]
+                  const square = `${file}${rankLabel}`
 
-                const isSelected = from === square
+                  const dark = isDarkSquare(fileIndex, rankIndex)
+                  const bg = squareBaseColor(fileIndex, rankIndex)
 
-                // lastUci = např. "e2e4" -> from="e2", to="e4"
-                const lastFrom = lastUci ? lastUci.slice(0, 2) : null
-                const lastTo = lastUci ? lastUci.slice(2, 4) : null
-                // Hidden, for testing: const isLastFrom = lastFrom === square
-                const isLastTo = lastTo === square
+                  const isSelected = from === square
+                  const isLastFrom = lastFrom === square
+                  const isLastTo = lastTo === square
+                  const isFlash = flashSquare === square
 
-                // coordinate labels: rank číslo jen na file "a", file písmeno jen na rank "1"
-                const showRank = fileIndex === 0
-                const showFile = rankIndex === 7
+                  // dev notes: coordinate labels – jen a-file ukazuje rank, jen 1-rank ukazuje file
+                  const showRank = showCoordinates && fileIndex === 0
+                  const showFile = showCoordinates && rankIndex === 7
+                  const coordColor = dark ? boardTheme.coordOnDark : boardTheme.coordOnLight
 
-                const bg = squareColor(fileIndex, rankIndex)
+                  const symbol = pieceToUnicode(piece as any)
 
-              // velmi jednoduché unicode figurky
-              const symbol = piece
-                ? piece.color === 'w'
-                  ? ({
-                      p: '♙',
-                      n: '♘',
-                      b: '♗',
-                      r: '♖',
-                      q: '♕',
-                      k: '♔',
-                    } as const)[piece.type]
-                  : ({
-                      p: '♟',
-                      n: '♞',
-                      b: '♝',
-                      r: '♜',
-                      q: '♛',
-                      k: '♚',
-                    } as const)[piece.type]
-                : ''
-
-
-
-              return (
-                <Pressable
-                  key={square}
-                  onPress={() => handleSquarePress(square)}
-                  style={{
-                    width: size,
-                    height: size,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: isFlash
-                        ? '#ef4444'
-                        : isSelected
-                            ? '#fcd34d'
-                            : isLastTo
-                            ? '#a7f3d0'
-                            : bg,
-                    opacity: disabled ? 0.7 : 1,
-                    }}
-                    disabled={disabled}
-                >
-                    <View style={{ position: 'relative', width: size, height: size }}>
-                        {showRank ? (
-                            <Text
-                            style={{
-                                position: 'absolute',
-                                top: 4,
-                                left: 4,
-                                fontSize: 10,
-                                opacity: 0.8,
-                            }}
-                            >
-                            {rankLabel}
-                            </Text>
+                  return (
+                    <Pressable
+                      key={square}
+                      onPress={() => handleSquarePress(square)}
+                      disabled={disabled}
+                      style={[
+                        styles.square,
+                        {
+                          width: squareSize,
+                          height: squareSize,
+                          backgroundColor: bg,
+                          opacity: disabled ? 0.72 : 1,
+                        },
+                      ]}
+                    >
+                      {/* Overlay layer (highlights) */}
+                      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                        {isLastFrom || isLastTo ? (
+                          <View
+                            style={[
+                              StyleSheet.absoluteFill,
+                              { backgroundColor: boardTheme.lastMove },
+                            ]}
+                          />
                         ) : null}
 
-                        {showFile ? (
-                            <Text
-                            style={{
-                                position: 'absolute',
-                                bottom: 4,
-                                right: 4,
-                                fontSize: 10,
-                                opacity: 0.8,
-                            }}
-                            >
-                            {file}
-                            </Text>
+                        {isSelected ? (
+                          <View
+                            style={[
+                              StyleSheet.absoluteFill,
+                              { backgroundColor: boardTheme.selected },
+                            ]}
+                          />
                         ) : null}
 
-                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ fontSize: Math.round(size * 0.42) }}>{symbol}</Text>
-                        </View>
-                    </View>
-                </Pressable>
-              )
-            })}
+                        {isFlash ? (
+                          <View
+                            style={[
+                              StyleSheet.absoluteFill,
+                              { backgroundColor: boardTheme.wrongFlash },
+                            ]}
+                          />
+                        ) : null}
+                      </View>
+
+                      {/* Coordinates */}
+                      {showRank ? (
+                        <Text
+                          style={[
+                            styles.coord,
+                            {
+                              color: coordColor,
+                              top: 4,
+                              left: 6,
+                              fontSize: Math.max(9, Math.round(squareSize * 0.14)),
+                            },
+                          ]}
+                        >
+                          {rankLabel}
+                        </Text>
+                      ) : null}
+
+                      {showFile ? (
+                        <Text
+                          style={[
+                            styles.coord,
+                            {
+                              color: coordColor,
+                              bottom: 4,
+                              right: 6,
+                              fontSize: Math.max(9, Math.round(squareSize * 0.14)),
+                            },
+                          ]}
+                        >
+                          {file}
+                        </Text>
+                      ) : null}
+
+                      {/* Piece layer (temporary unicode; next step will be SVG) */}
+                      <View style={styles.pieceCenter} pointerEvents="none">
+                        <Text style={{ fontSize: Math.round(squareSize * 0.46) }}>{symbol}</Text>
+                      </View>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
+        </View>
+      )}
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  header: {
+    fontWeight: '700',
+    fontSize: 14,
+    opacity: 0.9,
+  },
+  boardFrame: {
+    borderWidth: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+  },
+  square: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coord: {
+    position: 'absolute',
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  pieceCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})
