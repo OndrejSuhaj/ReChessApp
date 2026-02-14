@@ -1,6 +1,14 @@
+
 import type { Chess } from 'chess.js'
-import React, { useEffect, useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import {
+    PanResponder,
+    Pressable,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
+} from 'react-native'
 import { PieceSvg } from './chessboard/PieceSvg'
 import { boardTheme } from './chessboard/theme'
 import type { PieceCode } from './pieces/alpha'
@@ -9,17 +17,11 @@ const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
 const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'] as const
 
 function isDarkSquare(fileIndex: number, rankIndex: number) {
-  // (0,0) = a8 is light on standard boards
   return (fileIndex + rankIndex) % 2 === 1
 }
-
 function squareBaseColor(fileIndex: number, rankIndex: number) {
   return isDarkSquare(fileIndex, rankIndex) ? boardTheme.darkSquare : boardTheme.lightSquare
 }
-
-// dev notes: pomocné mapy jen pro TS inference v pieceToUnicode
-const whiteMap = { p: '♙', n: '♘', b: '♗', r: '♖', q: '♕', k: '♔' } as const
-const blackMap = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' } as const
 
 export function ChessBoard({
   game,
@@ -32,11 +34,8 @@ export function ChessBoard({
 }: {
   game: Chess
   onUci: (uci: string) => 'ok' | 'wrong' | 'illegal'
-  // dev notes: cap pro web – ať board není přerostlý
   maxBoardWidth?: number
-  // dev notes: vnitřní odsazení wrapperu kolem boardu
   padding?: number
-  // dev notes: pro zvýraznění posledního tahu (from+to)
   lastUci?: string | null
   disabled?: boolean
   showCoordinates?: boolean
@@ -45,87 +44,176 @@ export function ChessBoard({
 
   const [from, setFrom] = useState<string | null>(null)
   const [flashSquare, setFlashSquare] = useState<string | null>(null)
+  const [hoverSquare, setHoverSquare] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [dragPiece, setDragPiece] = useState<PieceCode | null>(null)
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null) 
 
-  // dev notes: Na RN Web se může při loadu krátce změnit šířka/layout → board by "poskočil".
-  // Proto lockneme boardPx po prvním stabilním výpočtu a měníme ho až při výraznější změně.
   const [lockedBoardPx, setLockedBoardPx] = useState<number | null>(null)
 
-  const safetyMargin = 24 // dev notes: rezerva pro layout/padding/taby (hlavně na webu)
+  const boardRef = useRef<View | null>(null)
+  const boardOrigin = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  const safetyMargin = 24
   const availableWidth = Math.max(0, windowWidth - padding * 2 - safetyMargin)
   const boardTarget = Math.min(availableWidth, maxBoardWidth)
 
-  // dev notes: minSquareSize – na mobilu/menším okně chceme umět jít níž
   const minSquareSize = 14
   const desiredSquareSize = Math.max(minSquareSize, Math.floor(boardTarget / 8))
   const desiredBoardPx = desiredSquareSize * 8
 
   useEffect(() => {
-  // dev notes: první lock jakmile máme rozumnou velikost
-  if (lockedBoardPx == null && desiredBoardPx >= 96) {
-    setLockedBoardPx(desiredBoardPx)
-    return
-  }
-
-  // dev notes: pokud už lock máme, měň jen při výrazné změně (resize)
-  if (lockedBoardPx != null && Math.abs(desiredBoardPx - lockedBoardPx) >= 16) {
-    setLockedBoardPx(desiredBoardPx)
-  }
-}, [desiredBoardPx, lockedBoardPx])
+    if (lockedBoardPx == null && desiredBoardPx >= 96) {
+      setLockedBoardPx(desiredBoardPx)
+      return
+    }
+    if (lockedBoardPx != null && Math.abs(desiredBoardPx - lockedBoardPx) >= 16) {
+      setLockedBoardPx(desiredBoardPx)
+    }
+  }, [desiredBoardPx, lockedBoardPx])
 
   const boardPx = lockedBoardPx ?? desiredBoardPx
   const squareSize = Math.floor(boardPx / 8)
 
-  const board = useMemo(() => {
-    // dev notes: board() je 8x8, ranks 8→1, files a→h
-    return game.board()
-  }, [game.fen()])
+  const board = useMemo(() => game.board(), [game.fen()])
+
+  const lastFrom = lastUci ? lastUci.slice(0, 2) : null
+  const lastTo = lastUci ? lastUci.slice(2, 4) : null
+  const isReady = boardPx >= 96
+
+  function pointToSquare(pageX: number, pageY: number): string | null {
+    const x = pageX - boardOrigin.current.x
+    const y = pageY - boardOrigin.current.y
+    if (x < 0 || y < 0 || x >= boardPx || y >= boardPx) return null
+
+    const fileIndex = Math.floor(x / squareSize)
+    const rankIndex = Math.floor(y / squareSize)
+    if (fileIndex < 0 || fileIndex > 7 || rankIndex < 0 || rankIndex > 7) return null
+
+    return `${FILES[fileIndex]}${RANKS[rankIndex]}`
+  }
+
+  function commitMove(fromSq: string, toSq: string) {
+    const uci = `${fromSq}${toSq}`
+    const result = onUci(uci)
+
+    if (result !== 'ok') {
+      setFlashSquare(toSq)
+      setTimeout(() => setFlashSquare(null), 220)
+    }
+  }
 
   function handleSquarePress(square: string) {
     if (disabled) return
 
-    // 1) první klik = vybrat FROM
     if (!from) {
       setFrom(square)
       return
     }
-
-    // 2) klik na stejný square = zrušit výběr
     if (from === square) {
       setFrom(null)
       return
     }
 
-    // 3) druhý klik = TO → UCI
-    const uci = `${from}${square}`
-    const result = onUci(uci)
-
-    // dev notes: krátký flash cílového pole při wrong/illegal
-    if (result !== 'ok') {
-      setFlashSquare(square)
-      setTimeout(() => setFlashSquare(null), 220)
-    }
-
+    commitMove(from, square)
     setFrom(null)
   }
 
-  const lastFrom = lastUci ? lastUci.slice(0, 2) : null
-  const lastTo = lastUci ? lastUci.slice(2, 4) : null
+  function getPieceCodeAt(square: string): PieceCode | null {
+    const p = game.get(square as any) // chess.js: { type, color } | null
+    if (!p) return null
+    return `${p.color}${p.type.toUpperCase()}` as PieceCode
+ }
 
-  // dev notes: pokud je width extrémně malá (nebo na prvním renderu), radši nevykresluj board
-  const isReady = boardPx >= 96
+    // pokud chceš omezit jen na "figura na tahu":
+  function isPieceMovableBySideToMove(square: string): boolean {
+    const p = game.get(square as any)
+    if (!p) return false
+    // game.turn() je 'w' | 'b'
+    return p.color === game.turn()
+  }
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => !disabled,
+        onStartShouldSetPanResponderCapture: () => !disabled,
+        onMoveShouldSetPanResponder: () => !disabled,
+        onPanResponderGrant: (evt) => {
+          if (disabled) return
+          const { pageX, pageY } = evt.nativeEvent
+          const sq = pointToSquare(pageX, pageY)
+          if (!sq) return
+
+          // varianta: jen figura na tahu
+          if (!isPieceMovableBySideToMove(sq)) return
+          
+          const piece = getPieceCodeAt(sq)
+          if (!piece) return
+
+          setDragPiece(piece)
+          setDragging(true)
+          setDragPos({ x: pageX, y: pageY })
+
+            setFrom(sq)
+            setHoverSquare(null)
+        },
+        onPanResponderMove: (evt) => {
+          if (disabled) return
+          if (!from) return
+          const { pageX, pageY } = evt.nativeEvent
+          const sq = pointToSquare(pageX, pageY)
+          setHoverSquare(sq)
+          setDragPos({ x: pageX, y: pageY })
+        },
+        onPanResponderRelease: () => {
+            if (disabled) return
+            if (from && hoverSquare && from !== hoverSquare) {
+                commitMove(from, hoverSquare)
+            }
+            setFrom(null)
+            setHoverSquare(null)
+
+            setDragging(false)
+            setDragPiece(null)
+            setDragPos(null)
+            },
+            onPanResponderTerminate: () => {
+            setFrom(null)
+            setHoverSquare(null)
+
+            setDragging(false)
+            setDragPiece(null)
+            setDragPos(null)
+            },
+      }),
+    [disabled, from, hoverSquare, boardPx, squareSize]
+  )
+
+  function updateBoardOrigin() {
+    const node: any = boardRef.current
+    if (!node?.measureInWindow) return
+    node.measureInWindow((x: number, y: number) => {
+      boardOrigin.current = { x, y }
+    })
+  }
 
   return (
     <View style={{ gap: 10 }}>
       <Text style={styles.header}>
-        Tap from → to {from ? `(from: ${from})` : ''}
+        Tap or drag from → to {from ? `(from: ${from})` : ''}
       </Text>
 
       {!isReady ? (
-        // dev notes: placeholder brání layout shift při úplně prvním renderu
         <View style={{ height: 320 }} />
       ) : (
         <View style={{ padding, width: '100%', alignSelf: 'stretch' }}>
           <View
+            ref={boardRef}
+            onLayout={() => {
+              requestAnimationFrame(updateBoardOrigin)
+            }}
+            {...panResponder.panHandlers}
             style={[
               styles.boardFrame,
               {
@@ -147,18 +235,23 @@ export function ChessBoard({
                   const bg = squareBaseColor(fileIndex, rankIndex)
 
                   const isSelected = from === square
+                  const isHover = hoverSquare === square
                   const isLastFrom = lastFrom === square
                   const isLastTo = lastTo === square
                   const isFlash = flashSquare === square
 
-                  // dev notes: coordinate labels – jen a-file ukazuje rank, jen 1-rank ukazuje file
                   const showRank = showCoordinates && fileIndex === 0
                   const showFile = showCoordinates && rankIndex === 7
                   const coordColor = dark ? boardTheme.coordOnDark : boardTheme.coordOnLight
 
-                  const pieceCode: PieceCode | null = piece
+                  let pieceCode: PieceCode | null = piece
                     ? (`${piece.color}${piece.type.toUpperCase()}` as PieceCode)
-                    : null// pieceCode bude např. "wP", "bK"
+                    : null
+
+                    // během dragu schovej původní figuru na start square
+                    if (dragging && from === square) {
+                        pieceCode = null
+                    }
 
                   return (
                     <Pressable
@@ -175,41 +268,34 @@ export function ChessBoard({
                         },
                       ]}
                     >
-                      {/* Overlay layer (highlights) */}
                       <View style={StyleSheet.absoluteFill} pointerEvents="none">
                         {isLastFrom || isLastTo ? (
-                          <View
-                            style={[
-                              StyleSheet.absoluteFill,
-                              { backgroundColor: boardTheme.lastMove },
-                            ]}
-                          />
+                          <View style={[StyleSheet.absoluteFill, { backgroundColor: boardTheme.lastMove }]} />
                         ) : null}
 
                         {isSelected ? (
                           <View
                             style={[
                               StyleSheet.absoluteFill,
-                              {
-                                borderWidth: 3,
-                                borderColor: boardTheme.selected,
-                                
-                                },
+                              { borderWidth: 3, borderColor: boardTheme.selected },
+                            ]}
+                          />
+                        ) : null}
+
+                        {isHover && !isSelected ? (
+                          <View
+                            style={[
+                              StyleSheet.absoluteFill,
+                              { borderWidth: 2, borderColor: boardTheme.selected, opacity: 0.5 },
                             ]}
                           />
                         ) : null}
 
                         {isFlash ? (
-                          <View
-                            style={[
-                              StyleSheet.absoluteFill,
-                              { backgroundColor: boardTheme.wrongFlash },
-                            ]}
-                          />
+                          <View style={[StyleSheet.absoluteFill, { backgroundColor: boardTheme.wrongFlash }]} />
                         ) : null}
                       </View>
 
-                      {/* Coordinates */}
                       {showRank ? (
                         <Text
                           style={[
@@ -242,56 +328,64 @@ export function ChessBoard({
                         </Text>
                       ) : null}
 
-                      {/* Piece layer (temporary unicode; next step will be SVG) */}
                       <View style={styles.pieceCenter} pointerEvents="none">
-                        {pieceCode ? <PieceSvg
-                                code={pieceCode as any}
-                                size={Math.round(squareSize * 0.88)}
-                                /> : null}
+                        {pieceCode ? (
+                          <PieceSvg code={pieceCode as any} size={Math.round(squareSize * 0.88)} />
+                        ) : null}
                       </View>
                     </Pressable>
                   )
                 })}
               </View>
+              
             ))}
+            {dragging && dragPiece && dragPos ? (
+                <View
+                pointerEvents="none"
+                style={[
+                    styles.ghost,
+                    {
+                    left: dragPos.x - boardOrigin.current.x - squareSize * 0.44,
+                    top: dragPos.y - boardOrigin.current.y - squareSize * 0.44,
+                    width: squareSize,
+                    height: squareSize,
+                    },
+                ]}
+                >
+                <PieceSvg
+                    code={dragPiece as any}
+                    size={Math.round(squareSize * 0.92)}
+                />
+                </View>
+            ) : null}
+
+            </View>
+
+
           </View>
-        </View>
       )}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  header: {
-    fontWeight: '700',
-    fontSize: 14,
-    opacity: 0.9,
-  },
-  boardFrame: {
-    borderWidth: 1,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-  },
-  square: {
+  header: { fontWeight: '700', fontSize: 14, opacity: 0.9 },
+  boardFrame: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  row: { flexDirection: 'row' },
+  square: { alignItems: 'center', justifyContent: 'center' },
+  coord: { position: 'absolute', fontWeight: '700', letterSpacing: 0.2 },
+  pieceCenter: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
   },
-  coord: {
+  ghost: {
     position: 'absolute',
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  pieceCenter: {
-  flex: 1,
-  alignItems: 'center',
-  justifyContent: 'center',
-
-  // jemný stín pro web
-  shadowColor: '#000',
-  shadowOpacity: 0.15,
-  shadowRadius: 2,
-  },
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.95,
+    },
 })
