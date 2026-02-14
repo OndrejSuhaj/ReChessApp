@@ -1,243 +1,107 @@
-import { Chess } from 'chess.js'
-import React, { useMemo, useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Link } from 'expo-router'
+import React, { useMemo } from 'react'
+import { FlatList, Text, useWindowDimensions, View } from 'react-native'
 
-import { getLessonById } from '../../src/domain/exercises'
-import type { RunnerState } from '../../src/domain/types'
-import { ChessBoard } from '../../src/ui/ChessBoard'
+import { getLessons, getLessonStats } from '../../src/domain/exercises'
+import { PositionPreview } from '../../src/ui/PositionPreview'
 
-export default function HomeScreen() {
+export default function LessonsScreen() {
+  const lessons = getLessons()
+  const { width } = useWindowDimensions()
 
-  const [state, setState] = useState<RunnerState>({
-    exerciseIndex: 0,
-    plyIndex: 0,
-    status: 'ready',
-  })
+  // Responsive columns (mobile 1, tablet 2, desktop 3)
+  const columns = useMemo(() => {
+    if (width >= 1100) return 3
+    if (width >= 720) return 2
+    return 1
+  }, [width])
 
-  const lesson = getLessonById('lesson-vienna-gambit') //-switch to Viesna Gambit for testing
-  
-  if (!lesson || lesson.exercises.length === 0) {
-    return (
-      <View style={{ padding: 24 }}>
-        <Text>Lesson not found.</Text>
-      </View>
-    )
-  }
-
-  const exercise = lesson.exercises[state.exerciseIndex]
-
-  if (!exercise) {
-    return (
-      <View style={{ padding: 24 }}>
-        <Text>Exercise index out of range.</Text>
-      </View>
-    )
-  }
-
-  const game = useMemo(
-    () => new Chess(exercise.fen), 
-    [exercise.fen, state.exerciseIndex])
-
-  const expected = exercise.script[state.plyIndex]
-
-  const isDone = state.plyIndex >= exercise.script.length
-  const hasNext = state.exerciseIndex < lesson.exercises.length - 1
-
-  const totalExercises = lesson.exercises.length
-  const lessonProgress = (state.exerciseIndex + 1) / totalExercises
-  const exerciseLen = exercise.script.length
-  const exerciseProgress = Math.min(state.plyIndex, exerciseLen) / exerciseLen
-
-  const [lastUci, setLastUci] = useState<string | null>(null)
-
-  function resetExercise() {
-    setLastUci(null)
-    setState((prev) => ({
-      exerciseIndex: Math.min(prev.exerciseIndex + 1, totalExercises - 1),
-      plyIndex: 0,
-      status: 'ready',
-    }))
-}
-
-function nextExercise() {
-  setLastUci(null)
-  setState((prev) => ({
-    exerciseIndex: Math.min(prev.exerciseIndex + 1, totalExercises - 1),
-    plyIndex: 0,
-    status: 'ready',
-    lastUci: null
-  }))
-}
-
-  function setStatus(s: string) {
-    setState((prev) => ({ ...prev, status: s }))
-  }
-
-function playUserUci(uci: string): 'ok' | 'wrong' | 'illegal' {
-  if (isDone) return 'wrong'
-
-  if (!expected || expected.actor !== 'user') {
-    setStatus('Not expecting user move now.')
-    return 'wrong'
-  }
-
-  if (expected.uci !== uci) {
-    setStatus(`Wrong. Expected: ${expected.uci}, got: ${uci}`)
-    return  'wrong'
-  }
-
-  const res = game.move({
-    from: uci.slice(0, 2),
-    to: uci.slice(2, 4),
-    promotion: 'q',
-  })
-
-  if (!res) {
-    setStatus(`Illegal move: ${uci}`)
-    return 'illegal'
-  }
-
-  setLastUci(uci)
-
-  let nextIndex = state.plyIndex + 1
-
-  // přehraj systémové tahy
-  while (
-    nextIndex < exercise.script.length &&
-    exercise.script[nextIndex].actor === 'system'
-  ) {
-    const sysUci = exercise.script[nextIndex].uci
-
-    game.move({
-      from: sysUci.slice(0, 2),
-      to: sysUci.slice(2, 4),
-      promotion: 'q',
-    })
-
-    nextIndex++
-  }
-
-  if (nextIndex >= exercise.script.length) {
-    setState((prev) => ({
-      ...prev,
-      plyIndex: nextIndex,
-      status: exercise.successMessage,
-    }))
-    return 'ok'
-  }
-
-  setState((prev) => ({
-    ...prev,
-    plyIndex: nextIndex,
-    status: 'ok',
-  }))
-  return 'ok'
-}
+  const contentPadding = 18
+  const gap = 14
+  const cardWidth =
+    Math.floor((width - contentPadding * 2 - gap * (columns - 1)) / columns)
 
   return (
-    <View style={{ flex: 1, padding: 24, gap: 16 }}>
-  {/* Lesson progress bar */}
-  <View style={{ gap: 8 }}>
-    <Text style={{ color: '#6b7280' }}>
-      Lesson progress: {state.exerciseIndex + 1}/{totalExercises}
-    </Text>
-    <View style={{ height: 10, borderRadius: 999, backgroundColor: '#e5e7eb' }}>
-      <View style={{ height: 10, borderRadius: 999, width: `${lessonProgress * 100}%`, backgroundColor: '#facc15' }} />
-    </View>
-  </View>
+    <View style={{ flex: 1, backgroundColor: '#F6F7FB' }}>
+      {/* Header placeholder (časem account / profile) */}
+      <View
+        style={{
+          paddingHorizontal: contentPadding,
+          paddingTop: 14,
+          paddingBottom: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(0,0,0,0.06)',
+          backgroundColor: '#FFFFFF',
+        }}
+      >
+        <Text style={{ fontSize: 14, fontWeight: '800', opacity: 0.7 }}>
+          ReChess
+        </Text>
+      </View>
 
-  {/* Main content */}
-  <View style={{ flex: 1, flexDirection: 'row', gap: 24, alignItems: 'flex-start' }}>
-    {/* LEFT: Board */}
-    <View style={{ gap: 12 }}>
-      <Text style={{ fontSize: 26, fontWeight: '800' }}>{lesson.title}</Text>
-      {lesson.description ? <Text style={{ maxWidth: 720, color: '#6b7280' }}>{lesson.description}</Text> : null}
+      <FlatList
+        data={lessons}
+        key={columns} // important: re-render layout when columns change
+        numColumns={columns}
+        contentContainerStyle={{
+          padding: contentPadding,
+          gap,
+        }}
+        columnWrapperStyle={columns > 1 ? { gap } : undefined}
+        renderItem={({ item: lesson }) => {
+          const stats = getLessonStats(lesson)
+          const fen = lesson.exercises[0]?.fen ?? ''
 
-      <ChessBoard
-        game={game}
-        onUci={playUserUci}
-        lastUci={lastUci}
-        disabled={isDone}
+          return (
+            <Link
+              href={`/lesson/${lesson.lessonId}` as any}
+              style={{
+                width: cardWidth,
+                borderRadius: 18,
+                backgroundColor: '#FFFFFF',
+                borderWidth: 1,
+                borderColor: 'rgba(0,0,0,0.06)',
+                padding: 14,
+              }}
+            >
+              <View style={{ gap: 10 }}>
+                <Text style={{ fontSize: 16, fontWeight: '900' }}>
+                  {lesson.title}
+                </Text>
+
+                {!!lesson.description ? (
+                  <Text style={{ opacity: 0.75, lineHeight: 18 }}>
+                    {lesson.description}
+                  </Text>
+                ) : null}
+
+                <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                  <Text style={{ opacity: 0.75 }}>
+                    {stats.exerciseCount} exercises
+                  </Text>
+                  <Text style={{ opacity: 0.75 }}>
+                    {stats.totalUserMoves} moves
+                  </Text>
+                  <Text style={{ opacity: 0.75 }}>
+                    {stats.totalPlies} plies
+                  </Text>
+                </View>
+
+                <View style={{ alignSelf: 'flex-start' }}>
+                  <PositionPreview
+                    fen={fen}
+                    size={Math.min(220, Math.max(150, cardWidth - 28))}
+                  />
+                </View>
+
+                <Text style={{ opacity: 0.55, fontWeight: '700' }}>
+                  Open →
+                </Text>
+              </View>
+            </Link>
+          )
+        }}
       />
-
-      {/* Exercise progress */}
-      <View style={{ gap: 8 }}>
-        <Text style={{ color: '#6b7280' }}>
-          Exercise progress: {Math.min(state.plyIndex, exerciseLen)}/{exerciseLen}
-        </Text>
-        <View style={{ height: 10, borderRadius: 999, backgroundColor: '#e5e7eb' }}>
-          <View style={{ height: 10, borderRadius: 999, width: `${exerciseProgress * 100}%`, backgroundColor: '#111827' }} />
-        </View>
-      </View>
     </View>
-
-    {/* RIGHT: Sidebar */}
-    <View
-      style={{
-        width: 360,
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        borderRadius: 16,
-        padding: 16,
-        gap: 12,
-        backgroundColor: '#111827',
-      }}
-    >
-      <View style={{ gap: 4 }}>
-        <Text style={{ color: 'white', fontSize: 16, fontWeight: '700' }}>
-          Practice · {lesson.title}
-        </Text>
-        <Text style={{ color: '#9ca3af' }}>
-          {exercise.label} · #{state.exerciseIndex + 1}
-        </Text>
-      </View>
-
-      {/* Status bubble */}
-      <View style={{ backgroundColor: 'white', borderRadius: 12, padding: 12 }}>
-        <Text style={{ fontWeight: '600' }}>
-          {state.status.startsWith('Wrong') || state.status.startsWith('Illegal')
-            ? '❌ ' + state.status
-            : isDone
-              ? '✅ ' + state.status
-              : state.status}
-        </Text>
-      </View>
-
-      {/* Primary Next (replaces "Learn") */}
-      <Pressable
-        onPress={isDone && hasNext ? nextExercise : undefined}
-        style={{
-          paddingVertical: 14,
-          borderRadius: 12,
-          alignItems: 'center',
-          backgroundColor: isDone && hasNext ? '#facc15' : '#374151',
-          opacity: isDone && hasNext ? 1 : 0.6,
-        }}
-      >
-        <Text style={{ fontWeight: '800' }}>
-          {isDone && hasNext ? 'Next →' : isDone && !hasNext ? 'Done' : 'Next (finish exercise)'}
-        </Text>
-      </Pressable>
-
-      {/* Secondary */}
-      <Pressable
-        onPress={() => {
-          setLastUci(null)
-          resetExercise()
-        }}
-        style={{
-          paddingVertical: 12,
-          borderRadius: 12,
-          alignItems: 'center',
-          backgroundColor: '#1f2937',
-          borderWidth: 1,
-          borderColor: '#374151',
-        }}
-      >
-        <Text style={{ color: 'white', fontWeight: '700' }}>Reset</Text>
-      </Pressable>
-    </View>
-  </View>
-</View>
   )
 }
