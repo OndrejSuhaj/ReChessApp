@@ -89,12 +89,12 @@ export default function LessonTrainerScreen() {
     if (!expected) return 'illegal'
 
     if (expected.actor !== 'user') {
-      setState((s) => ({ ...s, status: `Expected system move at ply ${s.plyIndex}` }))
+      setState((s) => ({ ...s, status: 'error', message: `Expected system move at ply ${s.plyIndex}` }))
       return 'illegal'
     }
 
     if (uci !== expected.uci) {
-      setState((s) => ({ ...s, status: 'wrong move' }))
+      setState((s) => ({ ...s, status: 'wrong-move', message: 'Wrong move' }))
       return 'wrong'
     }
 
@@ -103,7 +103,7 @@ export default function LessonTrainerScreen() {
       const test = new Chess(game.fen())
       const res = applyUci(test, uci)
       if (!res) {
-        setState((s) => ({ ...s, status: `illegal move: ${uci}` }))
+        setState((s) => ({ ...s, status: 'illegal-move', message: `Illegal move: ${uci}` }))
         return 'illegal'
       }
     }
@@ -123,7 +123,8 @@ export default function LessonTrainerScreen() {
       if (!res) {
         setState((s) => ({
           ...s,
-          status: `System script illegal: ${ply.uci}`,
+          status: 'error',
+          message: `System script illegal: ${ply.uci}`,
         }))
         setState((s) => ({ ...s, plyIndex: nextPlyIndex }))
         return 'ok'
@@ -137,7 +138,8 @@ export default function LessonTrainerScreen() {
       setState((s) => ({
         ...s,
         plyIndex: nextPlyIndex,
-        status: 'success',
+        status: 'completed',
+        message: undefined
       }))
     } else {
       setState((s) => ({
@@ -164,11 +166,11 @@ export default function LessonTrainerScreen() {
         game={game}
         onUci={handleUci}
         lastUci={lastUci}
-        disabled={state.status === 'success'}
+        disabled={state.status === 'completed'}
       />
 
       <View style={{ gap: 8 }}>
-        {state.status === 'success' ? (
+        {state.status === 'completed' ? (
           <View style={{ padding: 12, borderWidth: 1, borderRadius: 12 }}>
             <Text style={{ fontWeight: '800', fontSize: 16 }}>{exercise.successMessage}</Text>
             <Text style={{ opacity: 0.8, marginTop: 4 }}>
