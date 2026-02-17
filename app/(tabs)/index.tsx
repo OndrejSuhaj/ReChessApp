@@ -1,12 +1,14 @@
 import { Link } from 'expo-router'
 import React, { useMemo } from 'react'
-import { FlatList, Text, useWindowDimensions, View } from 'react-native'
+import { FlatList, Pressable, Text, useWindowDimensions, View } from 'react-native'
 
 import { getLessons, getLessonStats } from '../../src/domain/exercises'
+import { useAuth } from '../../src/auth/AuthContext'
 import { PositionPreview } from '../../src/ui/PositionPreview'
 
 export default function LessonsScreen() {
   const lessons = getLessons()
+  const { signOut, user } = useAuth()
   const { width } = useWindowDimensions()
 
   // Responsive columns (mobile 1, tablet 2, desktop 3)
@@ -32,11 +34,32 @@ export default function LessonsScreen() {
           borderBottomWidth: 1,
           borderBottomColor: 'rgba(0,0,0,0.06)',
           backgroundColor: '#FFFFFF',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: '800', opacity: 0.7 }}>
-          ReChess
-        </Text>
+        <View>
+          <Text style={{ fontSize: 14, fontWeight: '800', opacity: 0.7 }}>
+            ReChess
+          </Text>
+          <Text style={{ fontSize: 12, opacity: 0.55 }}>
+            {user?.name ?? user?.email}
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={signOut}
+          style={{
+            borderRadius: 10,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderWidth: 1,
+            borderColor: 'rgba(0,0,0,0.15)',
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: '700' }}>Logout</Text>
+        </Pressable>
       </View>
 
       <FlatList

@@ -19,10 +19,11 @@ export type Lesson = {
   exercises: Exercise[]
 }
 
-export type RunStatus = 'ready' | 'wrong' | 'illegal' | 'completed'
+export type RunStatus = 'ready' | 'wrong-move' | 'illegal-move' | 'completed'  | 'error' | 'success'
 
 export type RunnerState = {
   exerciseIndex: number
   plyIndex: number
   status: RunStatus
+  message?: string
 }
