@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// EN0005 – User
+model User {
+  id               String           @id @default(uuid()) @db.Uuid
+  googleSub        String           @unique
+  email            String
+  displayName      String?
+  photoUrl         String?
+  lastLoginAt      DateTime         @default(now())
+  createdAt        DateTime         @default(now())
+  lessonProgresses LessonProgress[]
+}
+
+// EN0001 – Lesson
+model Lesson {
+  lessonId         String           @id
+  title            String
+  exercises        Json
+  lessonProgresses LessonProgress[]
+}
+
+// EN0006 – LessonProgress
+model LessonProgress {
+  id                   String               @id @default(uuid()) @db.Uuid
+  userId               String               @db.Uuid
+  lessonId             String
+  status               LessonProgressStatus @default(InProgress)
+  currentExerciseIndex Int                  @default(0)
+  lastPlayedAt         DateTime             @default(now())
+  completedAt          DateTime?
+  createdAt            DateTime             @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [lessonId], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+enum LessonProgressStatus {
+  InProgress
+  Completed
+}
