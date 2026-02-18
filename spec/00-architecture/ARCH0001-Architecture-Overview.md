@@ -65,6 +65,22 @@ Responsibilities:
 
 The UI contains no chess validation logic and no script logic.
 
+## Identity Layer
+
+The Identity Layer is responsible for authentication and access control.
+
+The current implementation supports client-side Google OAuth authentication using Expo Auth Session. Authentication is handled entirely on the client and does not involve backend verification.
+
+Responsibilities:
+
+- Initiate OAuth login flow  
+- Store authenticated User in runtime state  
+- Gate access to application content  
+- Provide logout functionality  
+
+The Identity Layer does not modify deterministic script execution. Lesson, Exercise, Ply, Run, and Script Runner remain unchanged.
+
+
 ## Execution Flow
 
 1. User starts a Lesson (ref:UC0001)  
