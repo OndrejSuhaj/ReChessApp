@@ -12,12 +12,12 @@ datasource db {
 
 // EN0005 – User
 model User {
-  id               String           @id @default(uuid())
+  id               String           @id @default(uuid()) @db.Uuid
   googleSub        String           @unique
   email            String
   displayName      String?
   photoUrl         String?
-  lastLoginAt      DateTime
+  lastLoginAt      DateTime         @default(now())
   createdAt        DateTime         @default(now())
   lessonProgresses LessonProgress[]
 }
@@ -32,17 +32,17 @@ model Lesson {
 
 // EN0006 – LessonProgress
 model LessonProgress {
-  id                   String               @id @default(uuid())
-  userId               String
+  id                   String               @id @default(uuid()) @db.Uuid
+  userId               String               @db.Uuid
   lessonId             String
-  status               LessonProgressStatus
-  currentExerciseIndex Int
-  lastPlayedAt         DateTime
+  status               LessonProgressStatus @default(InProgress)
+  currentExerciseIndex Int                  @default(0)
+  lastPlayedAt         DateTime             @default(now())
   completedAt          DateTime?
   createdAt            DateTime             @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
-  lesson Lesson @relation(fields: [lessonId], references: [lessonId])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [lessonId], onDelete: Cascade)
 
   @@unique([userId, lessonId])
 }
