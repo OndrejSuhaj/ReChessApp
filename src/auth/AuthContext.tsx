@@ -1,8 +1,8 @@
+import type { AuthContextValue, AuthUser } from '@/src/auth/types'
+import type { AuthRequestPromptOptions } from 'expo-auth-session'
 import * as AuthSession from 'expo-auth-session'
 import * as WebBrowser from 'expo-web-browser'
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
-
-import type { AuthContextValue, AuthUser } from '@/src/auth/types'
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -29,19 +29,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
 
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: 'rechessapp',
-  })
 
-  const [request, _, promptAsync] = AuthSession.useAuthRequest(
+  // WEB-only: no scheme
+  const redirectUri = AuthSession.makeRedirectUri()
+  console.log('Redirect URI:', redirectUri)
+
+  const [request, _response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: googleClientId ?? '',
-      responseType: AuthSession.ResponseType.Token,
+      responseType: AuthSession.ResponseType.Token, // ✅ IMPORTANT
+      usePKCE: false, // ✅ IMPORTANT
       scopes: ['openid', 'profile', 'email'],
       redirectUri,
-      extraParams: {
-        prompt: 'select_account',
-      },
+      extraParams: { prompt: 'select_account' },
     },
     GOOGLE_DISCOVERY
   )
@@ -51,7 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError('Missing EXPO_PUBLIC_GOOGLE_CLIENT_ID environment variable.')
       return
     }
-
     if (!request) {
       setError('Google login is not ready yet. Please try again.')
       return
@@ -61,26 +60,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticating(true)
 
     try {
-      const result = await promptAsync()
+      const result = await promptAsync({ useProxy: true } as AuthRequestPromptOptions)
+      console.log('Auth result:', result)
 
-      if (result.type !== 'success') {
-        if (result.type !== 'dismiss' && result.type !== 'cancel') {
-          setError('Google login was not successful.')
-        }
-        return
-      }
+      if (result.type !== 'success') return
 
       const accessToken = result.params.access_token
-
       if (!accessToken) {
         setError('Google login did not return an access token.')
         return
       }
 
       const profileResponse = await fetch(GOOGLE_USERINFO_URL, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { Authorization: `Bearer ${accessToken}` },
       })
 
       if (!profileResponse.ok) {
@@ -96,8 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: profile.name,
         picture: profile.picture,
       })
-    } catch {
-      setError('Unexpected error during Google login.')
+    } catch (e) {
+      console.log('Google login error:', e)
+      setError(`Google login failed: ${String((e as any)?.message ?? e)}`)
     } finally {
       setIsAuthenticating(false)
     }
@@ -125,10 +118,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
-
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider')
-  }
-
+  if (!context) throw new Error('useAuth must be used within AuthProvider')
   return context
 }

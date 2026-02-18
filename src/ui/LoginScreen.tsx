@@ -1,10 +1,12 @@
+import { useAuth } from '@/src/auth/AuthContext'
+import * as AuthSession from 'expo-auth-session'
 import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 
-import { useAuth } from '@/src/auth/AuthContext'
-
 export function LoginScreen() {
   const { error, isAuthenticating, signInWithGoogle } = useAuth()
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'rechessapp' })
+
 
   return (
     <View
@@ -18,6 +20,9 @@ export function LoginScreen() {
     >
       <Text style={{ fontSize: 30, fontWeight: '900', marginBottom: 6 }}>
         ReChess
+      </Text>
+      <Text selectable style={{ fontSize: 12, opacity: 0.6 }}>
+        Redirect URI: {redirectUri}
       </Text>
       <Text style={{ opacity: 0.7, marginBottom: 22 }}>Sign in to continue</Text>
 
