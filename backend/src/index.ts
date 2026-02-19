@@ -1,5 +1,5 @@
-import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import Fastify from 'fastify';
 import prisma from './db/prisma';
 import { authRoutes } from './routes/auth';
 import { meRoutes } from './routes/me';
@@ -13,8 +13,27 @@ const fastify = Fastify({
 
 // Register CORS
 fastify.register(cors, {
-  origin: FRONTEND_URL,
-});
+  origin: (origin, cb) => {
+    // allow non-browser requests (curl, server-to-server)
+    if (!origin) return cb(null, true)
+
+    const allowed = new Set([
+      FRONTEND_URL,
+      'http://localhost:8081',
+      'http://127.0.0.1:8081',
+    ])
+
+    // If you access Expo Web via LAN hostname, allow same port too
+    // (optional but handy in local dev)
+    if (origin.startsWith('http://192.168.') && origin.endsWith(':8081')) {
+      return cb(null, true)
+    }
+
+    return cb(null, allowed.has(origin))
+  },
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type'],
+})
 
 // Declare request.user decorator (populated by authenticate preHandler)
 fastify.decorateRequest('user', null);

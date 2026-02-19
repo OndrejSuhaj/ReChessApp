@@ -3,16 +3,18 @@ import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   Text,
-  View,
+  View
 } from 'react-native'
 
 import * as ApiClient from '@/src/auth/apiClient'
+import { useAuth } from '@/src/auth/AuthContext'
 import { getTokens, saveTokens, SESSION_EXPIRED_MSG } from '@/src/auth/tokenStorage'
 import type { BackendUser, LessonProgressItem, UserProgress } from '@/src/auth/types'
-import { useAuth } from '@/src/auth/AuthContext'
+
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -139,27 +141,34 @@ export function ProfileScreen() {
   }, [fetchData])
 
   const handleDeleteAccount = useCallback(() => {
+    const runDelete = async () => {
+      setIsDeleting(true)
+      try {
+        await deleteAccount()
+        setSuccessMessage('Your account has been deleted.')
+        router.replace('/')
+      } catch (err: any) {
+        Alert.alert('Error', String(err?.message ?? 'Failed to delete account.'))
+      } finally {
+        setIsDeleting(false)
+      }
+    }
+
+    if (Platform.OS === 'web') {
+      const ok = window.confirm(
+        'This will permanently delete your account and all progress. This action cannot be undone.\n\nDo you want to continue?'
+      )
+      if (!ok) return
+      void runDelete()
+      return
+    }
+
     Alert.alert(
       'Delete Account',
       'This will permanently delete your account and all progress. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setIsDeleting(true)
-            try {
-              await deleteAccount()
-              setSuccessMessage('Your account has been deleted.')
-              router.replace('/')
-            } catch (err: any) {
-              Alert.alert('Error', String(err?.message ?? 'Failed to delete account.'))
-            } finally {
-              setIsDeleting(false)
-            }
-          },
-        },
+        { text: 'Delete', style: 'destructive', onPress: () => void runDelete() },
       ]
     )
   }, [deleteAccount, router])
