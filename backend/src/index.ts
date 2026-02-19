@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import prisma from './db/prisma';
 import { authRoutes } from './routes/auth';
+import { meRoutes } from './routes/me';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8081';
@@ -15,8 +16,14 @@ fastify.register(cors, {
   origin: FRONTEND_URL,
 });
 
+// Declare request.user decorator (populated by authenticate preHandler)
+fastify.decorateRequest('user', null);
+
 // Auth routes
 fastify.register(authRoutes);
+
+// Self-service /me routes
+fastify.register(meRoutes);
 
 // Health check route with DB connectivity check
 fastify.get('/health', async (request, reply) => {

@@ -55,6 +55,14 @@ export async function persistRefreshToken(
   });
 }
 
+export async function getById(userId: string): Promise<User | null> {
+  return prisma.user.findUnique({ where: { id: userId } });
+}
+
+export async function deleteById(userId: string): Promise<void> {
+  await prisma.user.delete({ where: { id: userId } });
+}
+
 export async function touchLastLogin(userId: string, now: Date): Promise<User> {
   return prisma.user.update({
     where: { id: userId },
