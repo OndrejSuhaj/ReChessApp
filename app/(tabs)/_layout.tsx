@@ -56,6 +56,14 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'My Profile',
+          tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
         name="lesson/[lessonId]"
         options={{
           href: null,          // schová z tab baru
