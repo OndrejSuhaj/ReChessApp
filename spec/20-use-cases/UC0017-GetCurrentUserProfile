@@ -1,0 +1,36 @@
+## Overview
+
+| cfl:noheader | Description |
+| --- | --- |
+| **Trigger** | User requests profile information. |
+| **Actors** | User<br>System |
+| **Preconditions** | Valid access token is provided<br>User (ref:EN0005) exists |
+| **Postconditions** | User profile data is returned |
+
+## Main Flow
+
+1. *User:* sends authenticated request for profile data  
+2. *System:* validates access token  
+3. *System:* loads User (ref:EN0005)  
+4. *System:* returns profile fields (`email`, `displayName`, `photoUrl`, `role`, `createdAt`, `lastLoginAt`)  
+End
+
+## 2A: Invalid Access Token
+
+- *System:* rejects request  
+End
+
+## 3A: User Not Found
+
+- *System:* rejects request  
+End
+
+## Related Entities
+
+- ref:EN0005 – User  
+
+## Notes on Implementation Constraints
+
+- Role must be derived server-side  
+- Profile data must not expose refreshTokenHash  
+- Deterministic runtime state must not be accessed  

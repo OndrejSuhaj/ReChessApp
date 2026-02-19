@@ -1,0 +1,45 @@
+## Overview
+
+| cfl:noheader | Description |
+| --- | --- |
+| **Trigger** | User requests a new access token using a refresh token. |
+| **Actors** | User<br>System |
+| **Preconditions** | User (ref:EN0005) exists<br>Valid refresh token is provided<br>`refreshTokenHash` is stored on User |
+| **Postconditions** | New access token is issued<br>Session remains valid |
+
+## Main Flow
+
+1. *User:* sends refresh token to the system  
+2. *System:* validates refresh token format  
+3. *System:* identifies User (ref:EN0005) associated with the token  
+4. *System:* verifies token against stored `refreshTokenHash` using ref:SRV0007  
+5. *System:* issues new access token  
+6. *System:* returns new access token to User  
+End
+
+## 4A: Invalid Refresh Token
+
+- *System:* detects token mismatch  
+- *System:* rejects request  
+End
+
+## 3A: User Not Found
+
+- *System:* cannot identify User  
+- *System:* rejects request  
+End
+
+## Related Entities
+
+- ref:EN0005 – User  
+
+## Related Services
+
+- ref:SRV0007 – SessionService  
+
+## Notes on Implementation Constraints
+
+- Refresh token must never be stored in plaintext  
+- Access token must be short-lived  
+- Deterministic training logic must remain unaffected  
+

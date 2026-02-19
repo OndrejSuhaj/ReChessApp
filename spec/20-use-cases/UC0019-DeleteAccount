@@ -1,0 +1,44 @@
+## Overview
+
+| cfl:noheader | Description |
+| --- | --- |
+| **Trigger** | User confirms account deletion. |
+| **Actors** | User<br>System |
+| **Preconditions** | Valid access token is provided<br>User (ref:EN0005) exists |
+| **Postconditions** | User is permanently removed<br>Associated LessonProgress (ref:EN0006) is removed<br>Session is invalidated |
+
+## Main Flow
+
+1. *User:* confirms account deletion  
+2. *System:* validates access token  
+3. *System:* deletes User (ref:EN0005)  
+4. *System:* cascade deletes associated LessonProgress (ref:EN0006)  
+5. *System:* invalidates session  
+6. *System:* confirms deletion  
+End
+
+## 2A: Invalid Access Token
+
+- *System:* rejects request  
+End
+
+## 3A: User Not Found
+
+- *System:* rejects request  
+End
+
+## Related Entities
+
+- ref:EN0005 – User  
+- ref:EN0006 – LessonProgress  
+
+## Related Services
+
+- ref:SRV0003 – UserService  
+- ref:SRV0007 – SessionService  
+
+## Notes on Implementation Constraints
+
+- Deletion is irreversible  
+- Session must not remain valid after deletion  
+- Deterministic training core must remain unaffected  

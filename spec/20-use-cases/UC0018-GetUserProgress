@@ -1,0 +1,43 @@
+## Overview
+
+| cfl:noheader | Description |
+| --- | --- |
+| **Trigger** | User requests aggregated progress data. |
+| **Actors** | User<br>System |
+| **Preconditions** | Valid access token is provided<br>User (ref:EN0005) exists |
+| **Postconditions** | Aggregated LessonProgress data is returned |
+
+## Main Flow
+
+1. *User:* sends authenticated request for progress data  
+2. *System:* validates access token  
+3. *System:* loads LessonProgress records (ref:EN0006) for User  
+4. *System:* calculates completed lesson count  
+5. *System:* returns progress summary and lesson status list  
+End
+
+## 2A: Invalid Access Token
+
+- *System:* rejects request  
+End
+
+## 3A: No Progress Records
+
+- *System:* returns completed count = 0  
+- *System:* returns empty progress list  
+End
+
+## Related Entities
+
+- ref:EN0005 – User  
+- ref:EN0006 – LessonProgress  
+- ref:EN0001 – Lesson  
+
+## Related Services
+
+- ref:SRV0005 – LessonProgressService  
+
+## Notes on Implementation Constraints
+
+- Aggregation must not modify LessonProgress  
+- Deterministic lesson execution must remain independent  
