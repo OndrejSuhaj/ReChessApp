@@ -240,3 +240,23 @@ Architecture decision:
 - UC0018 – GetUserProgress
 - UC0019 – DeleteAccount
 - SRV0007 – SessionService
+
+## Backend Anchor (v0.3)
+
+Backend-authoritative authentication, session model,
+user self-service endpoints (/me, /me/progress, DELETE /me),
+and frontend integration correspond to repository state at:
+
+`4167dd3`
+
+If any of the following change:
+
+- Prisma schema (EN0005 – User, EN0006 – LessonProgress)
+- Session token format or TTL semantics
+- Auth middleware behavior
+- /auth or /me API contract
+- Role resolution logic
+- Account deletion semantics (hard delete + cascade)
+
+ARCH0004 and all referenced EN / UC / SRV documents must be updated accordingly.
+
