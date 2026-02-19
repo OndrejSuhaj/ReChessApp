@@ -22,6 +22,7 @@ fastify.get('/health', async (request, reply) => {
     
     return { status: 'ok' };
   } catch (error) {
+    fastify.log.error(error, 'Database connectivity check failed');
     reply.status(503);
     return { status: 'db_unavailable' };
   }
