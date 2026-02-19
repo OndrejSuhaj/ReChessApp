@@ -10,7 +10,8 @@ export async function meRoutes(fastify: FastifyInstance): Promise<void> {
     '/me',
     { preHandler: authenticate },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = request.user!;
+      const user = request.user;
+      if (!user) return reply.status(401).send({ error: 'Unauthorized' });
       return reply.send({
         id: user.id,
         email: user.email,
@@ -28,7 +29,8 @@ export async function meRoutes(fastify: FastifyInstance): Promise<void> {
     '/me/progress',
     { preHandler: authenticate },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = request.user!;
+      const user = request.user;
+      if (!user) return reply.status(401).send({ error: 'Unauthorized' });
       const progresses = await LessonProgressService.listByUserId(user.id);
       const completedCount = progresses.filter(
         (p) => p.status === LessonProgressStatus.Completed,
@@ -52,7 +54,8 @@ export async function meRoutes(fastify: FastifyInstance): Promise<void> {
     '/me',
     { preHandler: authenticate },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = request.user!;
+      const user = request.user;
+      if (!user) return reply.status(401).send({ error: 'Unauthorized' });
       await UserService.deleteById(user.id);
       return reply.status(204).send();
     },
