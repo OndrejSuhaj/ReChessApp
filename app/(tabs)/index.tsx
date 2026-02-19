@@ -8,7 +8,7 @@ import { PositionPreview } from '../../src/ui/PositionPreview'
 
 export default function LessonsScreen() {
   const lessons = getLessons()
-  const { signOut, user } = useAuth()
+  const { user } = useAuth()
   const { width } = useWindowDimensions()
 
   // Responsive columns (mobile 1, tablet 2, desktop 3)
@@ -25,7 +25,7 @@ export default function LessonsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F6F7FB' }}>
-      {/* Header placeholder (časem account / profile) */}
+      {/* Header */}
       <View
         style={{
           paddingHorizontal: contentPadding,
@@ -48,18 +48,19 @@ export default function LessonsScreen() {
           </Text>
         </View>
 
-        <Pressable
-          onPress={signOut}
-          style={{
-            borderRadius: 10,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderWidth: 1,
-            borderColor: 'rgba(0,0,0,0.15)',
-          }}
-        >
-          <Text style={{ fontSize: 12, fontWeight: '700' }}>Logout</Text>
-        </Pressable>
+        <Link href="/profile" asChild>
+          <Pressable
+            style={{
+              borderRadius: 10,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderWidth: 1,
+              borderColor: 'rgba(0,0,0,0.15)',
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700' }}>My Profile</Text>
+          </Pressable>
+        </Link>
       </View>
 
       <FlatList

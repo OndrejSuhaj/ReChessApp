@@ -2,7 +2,10 @@ import type { AuthContextValue, AuthUser } from '@/src/auth/types'
 import type { AuthRequestPromptOptions } from 'expo-auth-session'
 import * as AuthSession from 'expo-auth-session'
 import * as WebBrowser from 'expo-web-browser'
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+
+import * as ApiClient from './apiClient'
+import { clearTokens, getTokens, saveTokens, SESSION_EXPIRED_MSG } from './tokenStorage'
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -14,17 +17,14 @@ const GOOGLE_DISCOVERY = {
   revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
 }
 
-const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
-
-type GoogleUserInfoResponse = {
-  sub: string
-  email: string
-  name: string
-  picture?: string
+/** Generate a random nonce string (required by Google for id_token flow). */
+function generateNonce(): string {
+  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,14 +34,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const redirectUri = AuthSession.makeRedirectUri()
   console.log('Redirect URI:', redirectUri)
 
+  // Nonce is generated once per request; stored in ref so it's stable across renders.
+  const nonceRef = useRef<string>(generateNonce())
+
   const [request, _response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: googleClientId ?? '',
-      responseType: AuthSession.ResponseType.Token, // ✅ IMPORTANT
-      usePKCE: false, // ✅ IMPORTANT
+      // id_token response type: Google returns a JWT ID token suitable for backend verification.
+      // A nonce is required by Google when using the id_token implicit flow.
+      responseType: AuthSession.ResponseType.IdToken,
+      usePKCE: false,
       scopes: ['openid', 'profile', 'email'],
       redirectUri,
-      extraParams: { prompt: 'select_account' },
+      extraParams: { prompt: 'select_account', nonce: nonceRef.current },
     },
     GOOGLE_DISCOVERY
   )
@@ -65,29 +70,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (result.type !== 'success') return
 
-      const accessToken = result.params.access_token
-      if (!accessToken) {
-        setError('Google login did not return an access token.')
+      const idToken = result.params.id_token
+      if (!idToken) {
+        setError('Google login did not return an ID token.')
         return
       }
 
-      const profileResponse = await fetch(GOOGLE_USERINFO_URL, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const loginResult = await ApiClient.loginWithGoogleIdToken(idToken)
+
+      saveTokens({
+        accessToken: loginResult.accessToken,
+        refreshToken: loginResult.refreshToken,
       })
 
-      if (!profileResponse.ok) {
-        setError('Unable to fetch Google profile information.')
-        return
-      }
-
-      const profile = (await profileResponse.json()) as GoogleUserInfoResponse
-
+      setAccessToken(loginResult.accessToken)
       setUser({
-        id: profile.sub,
-        email: profile.email,
-        name: profile.name,
-        picture: profile.picture,
+        id: loginResult.user.id,
+        email: loginResult.user.email,
+        name: loginResult.user.displayName ?? loginResult.user.email,
+        picture: loginResult.user.photoUrl ?? undefined,
       })
+      // Rotate nonce so a captured id_token cannot be replayed
+      nonceRef.current = generateNonce()
     } catch (e) {
       console.log('Google login error:', e)
       setError(`Google login failed: ${String((e as any)?.message ?? e)}`)
@@ -97,9 +101,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [googleClientId, promptAsync, request])
 
   const signOut = useCallback(() => {
+    clearTokens()
+    setAccessToken(null)
     setUser(null)
     setError(null)
   }, [])
+
+  /**
+   * Delete account (UC0019): calls DELETE /me with access token (refreshing once on 401),
+   * then clears local session.
+   */
+  const deleteAccount = useCallback(async () => {
+    const tokens = getTokens()
+    let token = tokens?.accessToken ?? accessToken
+
+    if (!token) {
+      throw new Error('Not authenticated')
+    }
+
+    try {
+      await ApiClient.deleteMe(token)
+    } catch (err: any) {
+      if (err?.status === 401 && tokens?.refreshToken) {
+        // Attempt token refresh once
+        try {
+          const refreshed = await ApiClient.refreshSession(tokens.refreshToken)
+          saveTokens({ accessToken: refreshed.accessToken, refreshToken: tokens.refreshToken })
+          setAccessToken(refreshed.accessToken)
+          token = refreshed.accessToken
+          await ApiClient.deleteMe(token)
+        } catch {
+          signOut()
+          throw new Error(SESSION_EXPIRED_MSG)
+        }
+      } else {
+        throw err
+      }
+    }
+
+    clearTokens()
+    setAccessToken(null)
+    setUser(null)
+    setError(null)
+  }, [accessToken, signOut])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -107,10 +151,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: Boolean(user),
       isAuthenticating,
       error,
+      accessToken,
       signInWithGoogle,
       signOut,
+      deleteAccount,
     }),
-    [error, isAuthenticating, signInWithGoogle, signOut, user]
+    [accessToken, deleteAccount, error, isAuthenticating, signInWithGoogle, signOut, user]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
