@@ -32,6 +32,9 @@ The default `.env` should contain:
 
 ```
 DATABASE_URL="postgresql://rechess:rechess@localhost:5432/rechessdb"
+GOOGLE_CLIENT_ID="1048806635587-t2seteuhoppdjdeqo273q3bg5hdsdknh.apps.googleusercontent.com"
+FRONTEND_URL="http://localhost:8081"
+PORT=3000
 ```
 
 ### 3. Install Dependencies
@@ -60,7 +63,27 @@ npm run prisma:migrate:dev
 
 When prompted for a migration name, you can use: `init`
 
-### 6. (Optional) Open Prisma Studio
+### 6. Run the Backend Server
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+The server will start on port 3000 (or the PORT specified in .env).
+
+### 7. Verify Server Health
+
+In a separate terminal, test the health endpoint:
+
+```bash
+curl http://localhost:3000/health
+```
+
+You should receive: `{"status":"ok"}`
+
+### 8. (Optional) Open Prisma Studio
 
 To visually browse and edit your database:
 
@@ -108,6 +131,9 @@ Should open Prisma Studio and show your three tables: User, Lesson, LessonProgre
 
 ## Available Scripts
 
+- `npm run dev` - Start development server with hot-reload
+- `npm run build` - Build production bundle
+- `npm run start` - Start production server (requires build first)
 - `npm run prisma:generate` - Generate Prisma Client
 - `npm run prisma:migrate:dev` - Create and apply migrations in development
 - `npm run prisma:migrate:deploy` - Apply migrations in production
